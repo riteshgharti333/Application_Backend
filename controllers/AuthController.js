@@ -2,90 +2,118 @@ import { catchAsyncError } from "../middlewares/catchAsyncError.js";
 import { Auth } from "../models/authModel.js";
 import { sendCookie } from "../utils/features.js";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import nodemailer from "nodemailer";
 
 // REGISTER
 export const register = catchAsyncError(async (req, res, next) => {
-  const { name, email, password } = req.body;
+  try {
+    const { name, email, password } = req.body;
 
-  if (!name || !email || !password) {
-    return res.status(200).json({
+    if (!name || !email || !password) {
+      return res.status(200).json({
+        result: 0,
+        message: "All fields are required!",
+      });
+    }
+
+    const existingUser = await Auth.findOne({ email });
+
+    if (existingUser) {
+      return res.status(200).json({
+        result: 0,
+        message: "Email Already Registered",
+      });
+    }
+
+    const user = await Auth.create({ name, email, password });
+
+    user.password = undefined;
+
+    res.status(200).json({
+      result: 1,
+      message: "Registered Successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("Error in registration:", error);
+
+    res.status(500).json({
       result: 0,
-      message: "All fields are required!",
+      message: "Internal Server Error. Please try again later.",
     });
   }
-
-  let existingUser = await Auth.findOne({ email });
-
-  if (existingUser) {
-    return res.status(200).json({
-      result: 0,
-      message: "Email Already Registered",
-    });
-  }
-
-  const user = await Auth.create({ name, email, password });
-
-  user.password = undefined;
-
-  res.status(200).json({
-    result: 1,
-    message: "Register Successfully",
-    user,
-  });
 });
 
 // LOGIN
 export const login = catchAsyncError(async (req, res, next) => {
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(200).json({
+    if (!email || !password) {
+      return res.status(200).json({
+        result: 0,
+        message: "Email and Password are required",
+      });
+    }
+
+    const user = await Auth.findOne({ email }).select("+password");
+
+    if (!user) {
+      return res.status(200).json({
+        result: 0,
+        message: "Invalid Email or Password",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(200).json({
+        result: 0,
+        message: "Invalid Email or Password",
+      });
+    }
+
+    user.password = undefined;
+
+    sendCookie(user, res, "Login Successfully", 200);
+  } catch (error) {
+    console.error("Error in login:", error);
+
+    res.status(500).json({
       result: 0,
-      message: "Email and Password are required",
+      message: "Internal Server Error. Please try again later.",
     });
   }
-
-  const user = await Auth.findOne({ email }).select("+password");
-
-  if (!user) {
-    return res.status(200).json({
-      result: 0,
-      message: "Invalid Email or Password",
-    });
-  }
-
-  const isMatch = await bcrypt.compare(password, user.password);
-
-  if (!isMatch) {
-    return res.status(200).json({
-      result: 0,
-      message: "Invalid Email or Password",
-    });
-  }
-
-  user.password = undefined;
-
-  sendCookie(user, res, "Login Successfully", 200);
 });
 
 // LOGOUT
 export const logout = catchAsyncError(async (req, res) => {
-  res
-    .status(200)
-    .cookie("sessionToken", "", {
-      expires: new Date(Date.now()),
-      sameSite: process.env.NODE_ENV === "Development" ? "lax" : "none",
-      secure: process.env.NODE_ENV === "Development" ? false : true,
-      httpOnly: true,
-    })
-    .json({
-      result: 1,
-      message: "Logout Successfully",
+  try {
+    res
+      .status(200)
+      .cookie("sessionToken", "", {
+        expires: new Date(Date.now()),
+        sameSite: process.env.NODE_ENV === "Development" ? "lax" : "none",
+        secure: process.env.NODE_ENV === "Development" ? false : true,
+        httpOnly: true,
+      })
+      .json({
+        result: 1,
+        message: "Logout Successfully",
+      });
+  } catch (error) {
+    console.error("Error in logout:", error);
+
+    res.status(500).json({
+      result: 0,
+      message: "Internal Server Error. Please try again later.",
     });
+  }
 });
 
 // UPDATE PASSWORD USING SESSION TOKEN
-
 export const changePassword = catchAsyncError(async (req, res, next) => {
   const { oldPassword, newPassword } = req.body;
 
@@ -154,28 +182,39 @@ export const changePassword = catchAsyncError(async (req, res, next) => {
   });
 });
 
+// PROFILE
+
 export const profile = catchAsyncError(async (req, res, next) => {
-  if (!req.user) {
-    return res.status(200).json({
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        result: 0,
+        message: "Unauthorized: Please login to access profile",
+      });
+    }
+
+    const user = await Auth.findById(req.user.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        result: 0,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      result: 1,
+      message: "Profile fetched successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("Error in fetching profile:", error);
+
+    res.status(500).json({
       result: 0,
-      message: "Unauthorized: Please login to access profile",
+      message: "Internal Server Error. Please try again later.",
     });
   }
-
-  const user = await Auth.findById(req.user.id).select("-password");
-
-  if (!user) {
-    return res.status(200).json({
-      result: 0,
-      message: "User not found",
-    });
-  }
-
-  res.status(200).json({
-    result: 1,
-    message: "Profile fetched successfully",
-    user,
-  });
 });
 
 // FORGOT PASSWORD
@@ -265,21 +304,22 @@ export const forgotPassword = catchAsyncError(async (req, res, next) => {
 });
 
 // RESET PASSWORD
+// RESET PASSWORD
 export const resetPassword = catchAsyncError(async (req, res, next) => {
   try {
     const { id, sessionToken } = req.params;
     const { password } = req.body;
 
     if (!password) {
-      return res.status(200).json({
+      return res.status(400).json({
         result: 0,
         message: "Password is required",
       });
     }
 
-    const user = await Auth.findById(id);
+    const user = await Auth.findById(id).select("+password");
     if (!user) {
-      return res.status(200).json({
+      return res.status(404).json({
         result: 0,
         message: "User not found",
       });
@@ -291,21 +331,38 @@ export const resetPassword = catchAsyncError(async (req, res, next) => {
       jwt.verify(modifiedToken, process.env.JWT_SECRET);
     } catch (err) {
       console.log(err);
-      return res.status(200).json({
+      return res.status(401).json({
         result: 0,
         message: "Invalid or expired token",
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    await Auth.updateOne({ _id: id }, { $set: { password: hashedPassword } });
+    // ✅ Apply schema validation during password update
+    user.password = password;
+
+    // ✅ Trigger schema validation with `.save()`
+    await user.save({ validateBeforeSave: true });
 
     return res.status(200).json({
       result: 1,
       message: "Password updated successfully",
     });
+
   } catch (error) {
     console.error(error);
+
+    // ✅ Handle Mongoose Validation Errors
+    if (error.name === "ValidationError") {
+      const validationErrors = Object.values(error.errors)
+        .map((err) => err.message)
+        .join(", ");
+
+      return res.status(400).json({
+        result: 0,
+        message: validationErrors,
+      });
+    }
+
     return res.status(500).json({
       result: 0,
       message: "Server error, please try again later",

@@ -2,12 +2,18 @@ import express from "express";
 import { config } from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import mongoSanitize from "express-mongo-sanitize";
 
 import { errorMiddleware } from "./middlewares/error.js";
 import authRouter from "./routes/authRoute.js";
 
 // Initialize Express app
 export const app = express();
+
+
+app.use(helmet());  
+app.use(mongoSanitize()); 
 
 // Load environment variables
 config({
@@ -17,7 +23,7 @@ config({
 // Configure CORS settings
 const allowedOrigins = [
   "http://localhost:5173",
-  "http://localhost:5000",
+  "http://localhost:3000",
   process.env.FRONTEND_URL,
   process.env.ADMIN_URL,
 ];
