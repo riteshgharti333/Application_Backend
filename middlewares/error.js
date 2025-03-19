@@ -9,6 +9,15 @@ export const errorMiddleware = (err, req, res, next) => {
     if (process.env.NODE_ENV === "development") {
       console.error(err.stack);
     }
+
+      // Handle Mongoose validation errors
+  if (err.name === "ValidationError") {
+    statusCode = 200;
+    message = Object.values(err.errors)
+      .map((val) => val.message)
+      .join(", ");
+  }
+
   
     // Send the response
     res.status(statusCode).json({
