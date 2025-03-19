@@ -1,4 +1,5 @@
 // Error Handling Middleware
+
 export const errorMiddleware = (err, req, res, next) => {
     // Default message and status
     let message = err.message || "Internal Server Error!";
@@ -11,7 +12,7 @@ export const errorMiddleware = (err, req, res, next) => {
   
     // Send the response
     res.status(statusCode).json({
-      success: false,
+      result: 0,
       message: message,
     });
   };
