@@ -4,113 +4,72 @@ import { sendCookie } from "../utils/features.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
+import ErrorHandler from "../utils/errorHandler.js";
 
 // REGISTER
 export const register = catchAsyncError(async (req, res, next) => {
-  try {
-    const { name, email, password } = req.body;
+  const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(200).json({
-        result: 0,
-        message: "All fields are required!",
-      });
-    }
-
-    const existingUser = await Auth.findOne({ email });
-
-    if (existingUser) {
-      return res.status(200).json({
-        result: 0,
-        message: "Email Already Registered",
-      });
-    }
-
-    const user = await Auth.create({ name, email, password });
-
-    user.password = undefined;
-
-    res.status(200).json({
-      result: 1,
-      message: "Registered Successfully",
-      user,
-    });
-  } catch (error) {
-    console.error("Error in registration:", error);
-
-    res.status(500).json({
-      result: 0,
-      message: "Internal Server Error. Please try again later.",
-    });
+  if (!name || !email || !password) {
+    throw new ErrorHandler("All fields are required!", 200);
   }
+
+  const existingUser = await Auth.findOne({ email });
+
+  if (existingUser) {
+    throw new ErrorHandler("Email Already Registered", 200);
+  }
+
+  const user = await Auth.create({ name, email, password });
+
+  user.password = undefined;
+
+  res.status(201).json({
+    result: 1,
+    message: "Registered Successfully",
+    user,
+  });
 });
 
 // LOGIN
 export const login = catchAsyncError(async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(200).json({
-        result: 0,
-        message: "Email and Password are required",
-      });
-    }
-
-    const user = await Auth.findOne({ email }).select("+password");
-
-    if (!user) {
-      return res.status(200).json({
-        result: 0,
-        message: "Invalid Email or Password",
-      });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      return res.status(200).json({
-        result: 0,
-        message: "Invalid Email or Password",
-      });
-    }
-
-    user.password = undefined;
-
-    sendCookie(user, res, "Login Successfully", 200);
-  } catch (error) {
-    console.error("Error in login:", error);
-
-    res.status(500).json({
-      result: 0,
-      message: "Internal Server Error. Please try again later.",
-    });
+  if (!email || !password) {
+    return next(new ErrorHandler("Email and Password are required", 200));
   }
+
+  const user = await Auth.findOne({ email }).select("+password");
+
+  if (!user) {
+    return next(new ErrorHandler("Invalid Email or Password", 200));
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+
+  if (!isMatch) {
+    return next(new ErrorHandler("Invalid Email or Password", 200));
+  }
+
+  user.password = undefined;
+
+  sendCookie(user, res, "Login Successfully", 200);
 });
 
 // LOGOUT
-export const logout = catchAsyncError(async (req, res) => {
-  try {
-    res
-      .status(200)
-      .cookie("sessionToken", "", {
-        expires: new Date(Date.now()),
-        sameSite: process.env.NODE_ENV === "Development" ? "lax" : "none",
-        secure: process.env.NODE_ENV === "Development" ? false : true,
-        httpOnly: true,
-      })
-      .json({
-        result: 1,
-        message: "Logout Successfully",
-      });
-  } catch (error) {
-    console.error("Error in logout:", error);
-
-    res.status(500).json({
-      result: 0,
-      message: "Internal Server Error. Please try again later.",
+export const logout = catchAsyncError(async (req, res, next) => {
+  res
+    .status(200)
+    .cookie("sessionToken", "", {
+      expires: new Date(0), // Immediately expire the cookie
+      sameSite: process.env.NODE_ENV === "development" ? "lax" : "none",
+      secure: process.env.NODE_ENV !== "development",
+      httpOnly: true,
+    })
+    .json({
+      result: 1,
+      message: "Logout Successfully",
     });
-  }
 });
 
 // UPDATE PASSWORD USING SESSION TOKEN
@@ -185,37 +144,25 @@ export const changePassword = catchAsyncError(async (req, res, next) => {
 // PROFILE
 
 export const profile = catchAsyncError(async (req, res, next) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        result: 0,
-        message: "Unauthorized: Please login to access profile",
-      });
-    }
-
-    const user = await Auth.findById(req.user.id).select("-password");
-
-    if (!user) {
-      return res.status(404).json({
-        result: 0,
-        message: "User not found",
-      });
-    }
-
-    res.status(200).json({
-      result: 1,
-      message: "Profile fetched successfully",
-      user,
-    });
-  } catch (error) {
-    console.error("Error in fetching profile:", error);
-
-    res.status(500).json({
-      result: 0,
-      message: "Internal Server Error. Please try again later.",
-    });
+  if (!req.user) {
+    return next(
+      new ErrorHandler("Unauthorized: Please login to access profile", 401)
+    );
   }
+
+  const user = await Auth.findById(req.user.id).select("-password");
+
+  if (!user) {
+    return next(new ErrorHandler("User not found", 404));
+  }
+
+  res.status(200).json({
+    result: 1,
+    message: "Profile fetched successfully",
+    user,
+  });
 });
+
 
 // FORGOT PASSWORD
 
