@@ -1,7 +1,7 @@
 import UpstoxClient from "upstox-js-sdk";
 import { WebSocket as WS } from "ws";
 import protobuf from "protobufjs";
-import smStock from "../models/smModel.js";
+import Stock from "../models/smModel.js";
 import { chunks } from "../utils/instruments.js";
 
 import { broadcastStockUpdate } from "./stockBroadcaster.js";
@@ -63,27 +63,27 @@ export const startUpstoxFeed = async (accessToken) => {
     socket.on("open", () => {
       console.log("🔌 WebSocket connected");
 
-      const subscriptionMsg = {
-        guid: "sub-reliance",
-        method: "sub",
-        data: {
-          mode: "full",
-          instrumentKeys: ["NSE_EQ|INE002A01018"], // Reliance Industries Limited
-        },
-      };
+      // const subscriptionMsg = {
+      //   guid: "sub-reliance",
+      //   method: "sub",
+      //   data: {
+      //     mode: "full",
+      //     instrumentKeys: ["NSE_EQ|INE002A01018"], // Reliance Industries Limited
+      //   },
+      // };
 
-      // chunks.forEach((chunk, index) => {
-      //   const subscriptionMsg = {
-      //     guid: `sub-${index}`,
-      //     method: "sub",
-      //     data: {
-      //       mode: "full",
-      //       instrumentKeys: chunk,
-      //     },
-      //   };
+      chunks.forEach((chunk, index) => {
+        const subscriptionMsg = {
+          guid: `sub-${index}`,
+          method: "sub",
+          data: {
+            mode: "full",
+            instrumentKeys: chunk,
+          },
+        };
       socket.send(Buffer.from(JSON.stringify(subscriptionMsg)));
-      // console.log(`📡 Subscribed to chunk ${index + 1} with ${chunk.length} instruments`);
-      // });
+      console.log(`📡 Subscribed to chunk ${index + 1} with ${chunk.length} instruments`);
+      });
     });
 
     socket.on("message", async (data) => {
@@ -99,7 +99,7 @@ export const startUpstoxFeed = async (accessToken) => {
         const { ltp, ltt, ltq, cp } = ltpc || {};
 
         // ✅ Store to DB
-        await smStock.findOneAndUpdate(
+        await Stock.findOneAndUpdate(
           { symbol },
           {
             marketData: marketFF,
