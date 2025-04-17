@@ -7,6 +7,7 @@ import nodemailer from "nodemailer";
 import ErrorHandler from "../utils/errorHandler.js";
 
 // REGISTER
+
 export const register = catchAsyncError(async (req, res, next) => {
   const { name, email, password } = req.body;
 
@@ -15,23 +16,20 @@ export const register = catchAsyncError(async (req, res, next) => {
   }
 
   const existingUser = await Auth.findOne({ email });
-
   if (existingUser) {
     throw new ErrorHandler("Email Already Registered", 200);
   }
 
   const user = await Auth.create({ name, email, password });
-
   user.password = undefined;
 
-  res.status(201).json({
-    result: 1,
-    message: "Registered Successfully",
-    user,
-  });
+  // Optional: Set cookie
+  sendCookie(user, res);
+
+  // 🔁 Redirect to Upstox login route
+  return res.redirect("http://localhost:3000/api/auth/upstox/login");
 });
 
-// LOGIN
 export const login = catchAsyncError(async (req, res, next) => {
   const { email, password } = req.body;
 
@@ -40,20 +38,20 @@ export const login = catchAsyncError(async (req, res, next) => {
   }
 
   const user = await Auth.findOne({ email }).select("+password");
-
   if (!user) {
     return next(new ErrorHandler("Invalid Email or Password", 200));
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
-
   if (!isMatch) {
     return next(new ErrorHandler("Invalid Email or Password", 200));
   }
 
-  user.password = undefined;
+  // Optional: Set cookie
+  sendCookie(user, res);
 
-  sendCookie(user, res, "Login Successfully", 200);
+  // 🔁 Redirect to Upstox OAuth
+  // return res.redirect("http://localhost:3000/api/auth/upstox/login");
 });
 
 // LOGOUT
@@ -162,7 +160,6 @@ export const profile = catchAsyncError(async (req, res, next) => {
     user,
   });
 });
-
 
 // FORGOT PASSWORD
 
@@ -294,7 +291,6 @@ export const resetPassword = catchAsyncError(async (req, res, next) => {
       result: 1,
       message: "Password updated successfully",
     });
-
   } catch (error) {
     console.error(error);
 

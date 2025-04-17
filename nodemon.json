@@ -1,0 +1,4 @@
+{
+  "watch": ["."],
+  "ignore": ["./services/upstoxFeed.js"]
+}

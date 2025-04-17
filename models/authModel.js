@@ -24,6 +24,14 @@ const authSchema = new mongoose.Schema(
       required: [true, "Password is required"],
       minlength: [8, "Password must be at least 8 characters"],
     },
+    upstoxAccessToken: {
+      type: String,
+      default: null,
+    },
+    upstoxRefreshToken: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );
@@ -41,7 +49,6 @@ authSchema.pre("save", async function (next) {
 });
 
 authSchema.methods.updatePassword = async function (newPassword) {
-  
   // ✅ Ensure the password is at least 8 characters long
   if (newPassword.length < 8) {
     throw new Error("New password must be at least 8 characters long.");

@@ -7,13 +7,15 @@ import mongoSanitize from "express-mongo-sanitize";
 
 import { errorMiddleware } from "./middlewares/error.js";
 import authRouter from "./routes/authRoute.js";
+import upstoxRouter from "./routes/upstoxRoute.js";
+import stockRouter from "./routes/stockRoute.js";
+
 
 // Initialize Express app
 export const app = express();
 
-
-app.use(helmet());  
-app.use(mongoSanitize()); 
+app.use(helmet());
+app.use(mongoSanitize());
 
 // Load environment variables
 config({
@@ -47,12 +49,17 @@ app.use(
 app.use(cookieParser());
 app.use(express.json());
 
+
 // Routes
 app.use("/api/auth", authRouter);
+app.use("/api/auth/upstox", upstoxRouter);
+app.use("/api/stock" , stockRouter)
+
 
 app.get("/", (req, res) => {
   res.send("Welcome to Backend");
 });
+
 
 // Error Middleware
 app.use(errorMiddleware);
