@@ -17,30 +17,45 @@ export const upstoxCallback = catchAsyncError(async (req, res, next) => {
   if (!state) return next(new ErrorHandler("User info (state) missing", 400));
 
   try {
-    const response = await fetch("https://api.upstox.com/v2/login/authorization/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        code,
-        client_id: process.env.UPSTOX_API_KEY,
-        client_secret: process.env.UPSTOX_API_SECRET,
-        redirect_uri: process.env.UPSTOX_REDIRECT_URI,
-        grant_type: "authorization_code",
-      }),
-    });
+    const response = await fetch(
+      "https://api.upstox.com/v2/login/authorization/token",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          code,
+          client_id: process.env.UPSTOX_API_KEY,
+          client_secret: process.env.UPSTOX_API_SECRET,
+          redirect_uri: process.env.UPSTOX_REDIRECT_URI,
+          grant_type: "authorization_code",
+        }),
+      }
+    );
 
     const data = await response.json();
 
     if (!response.ok) {
       console.error("❌ Error from Upstox token API:", data);
       return next(
-        new ErrorHandler(data?.errors?.[0]?.message || "Token request failed", 500)
+        new ErrorHandler(
+          data?.errors?.[0]?.message || "Token request failed",
+          500
+        )
       );
     }
 
+    console.log("📦 Raw token response from Upstox:");
+    console.log(JSON.stringify(data, null, 2));
+
     const { access_token, refresh_token } = data;
+
+    console.log("🔑 Extracted tokens =>");
+    console.log("Access Token:", access_token);
+    console.log("Refresh Token:", refresh_token);
+
+
     const userId = state;
 
     await Auth.findByIdAndUpdate(userId, {
@@ -66,7 +81,7 @@ export const upstoxCallback = catchAsyncError(async (req, res, next) => {
 
     res.status(200).json({
       result: 1,
-      message: "Upstox access token stored successfully",
+      message: "Upstox access token stored successfxully",
       access_token,
     });
   } catch (err) {
@@ -82,7 +97,7 @@ export const getLoginUrl = catchAsyncError(async (req, res, next) => {
       process.env.UPSTOX_API_KEY
     }&redirect_uri=${encodeURIComponent(
       process.env.UPSTOX_REDIRECT_URI
-    )}&scope=profile_read&state=${req.user._id}`;
+    )}&scope=profile+openid+offline_access&state=${req.user._id}`;
 
     res.status(200).json({
       result: 1,

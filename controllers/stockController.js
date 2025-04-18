@@ -13,3 +13,17 @@ export const getStock = catchAsyncError(async (req, res, next) => {
 
   res.status(200).json({ success: true, data: stock });
 });
+
+
+export const getAllStocks = catchAsyncError(async (req, res, next) => {
+  const stocks = await Stock.find();
+
+  if (!stocks || stocks.length === 0) {
+    throw new ErrorHandler("No stock data found", 404);
+  }
+
+  res.status(200).json({
+    success: true,
+    data: stocks,
+  });
+});

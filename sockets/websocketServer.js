@@ -1,53 +1,54 @@
-// /sockets/websocketServer.js
 import { WebSocketServer } from "ws";
-import { URL } from "url";
-import {
-  addClient,
-  removeClient,
-  subscribeClient,
-} from "../utils/clientManager.js";
+import url from "url";
+import Stock from "../models/smModel.js";
 
-let wss;
+const clients = new Map(); // Map<ws, Set<symbol>>
 
-export function setupWebSocket(server = null) {
-  wss = server
-    ? new WebSocketServer({ server }) // Render
-    : new WebSocketServer({ port: 8081 }); // Local
+export const setupWebSocket = (serverPort = 8081) => {
+  const wss = new WebSocketServer({ port: serverPort });
 
-  wss.on("connection", (client, req) => {
-    const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
-    const token = parsedUrl.searchParams.get("token");
-    const symbol = parsedUrl.searchParams.get("symbol");
+  wss.on("connection", async (ws, req) => {
+    const parsedUrl = url.parse(req.url, true);
+    const rawSymbols = parsedUrl.query.symbol;
 
-    console.log("🔌 WebSocket Client Connected");
-    console.log("🔐 Token:", token);
-    console.log("📦 Symbol:", symbol);
+    // Support: /symbol?symbol=s1&symbol=s2 or /symbol?symbol=s1
+    const symbolArray = Array.isArray(rawSymbols) ? rawSymbols : [rawSymbols];
+    const subscribedSymbols = new Set(symbolArray.filter(Boolean));
 
-    addClient(client);
+    clients.set(ws, subscribedSymbols);
+    console.log("🔗 Client connected for symbols:", [...subscribedSymbols]);
 
-    if (symbol) subscribeClient(client, symbol);
+    // Send initial DB data for these symbols
+    try {
+      const initialData = await Stock.find(
+        { symbol: { $in: [...subscribedSymbols] } },
+        "symbol ltp ltt ltq cp"
+      ).lean();
+      ws.send(JSON.stringify({ type: "initial_stock_data", data: initialData }));
+    } catch (err) {
+      console.error("❌ Error sending initial data:", err);
+    }
 
-    client.on("message", (msg) => {
-      try {
-        const { type, symbol } = JSON.parse(msg);
-        if (type === "subscribe" && symbol) {
-          subscribeClient(client, symbol);
-        }
-      } catch (err) {
-        console.error("💥 Error parsing message:", err);
-      }
-    });
-
-    client.on("close", () => {
-      removeClient(client);
+    ws.on("close", () => {
+      clients.delete(ws);
+      console.log("❌ Client disconnected");
     });
   });
 
-  console.log(
-    `🧠 WebSocket Server ${
-      server ? "attached to Express (Render)" : "running on ws://localhost:8081"
-    }`
-  );
-}
+  // Broadcast only to relevant clients
+  const sendLiveUpdate = (payload) => {
+    for (const [ws, subscribedSymbols] of clients.entries()) {
+      if (ws.readyState === ws.OPEN) {
+        const filtered = payload.filter(item => subscribedSymbols.has(item.symbol));
+        if (filtered.length > 0) {
+          ws.send(JSON.stringify({ type: "live_stock_update", data: filtered }));
+        }
+      }
+    }
+  };
 
-export { wss };
+  // Make broadcaster globally callable
+  global.liveStockBroadcaster = sendLiveUpdate;
+
+  console.log(`🚀 WebSocket server started on ws://localhost:${serverPort}`);
+};

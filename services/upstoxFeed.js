@@ -1,13 +1,13 @@
 import UpstoxClient from "upstox-js-sdk";
 import { WebSocket as WS } from "ws";
 import protobuf from "protobufjs";
-import Stock from "../models/smModel.js";
+import Stock from "../models/stockModel.js";
 import { chunks } from "../utils/instruments.js";
-
-import { broadcastStockUpdate } from "./stockBroadcaster.js";
+import { broadcast } from "../sockets/clientManager.js";
 
 let protobufRoot = null;
 
+// Load Protobuf schema
 const initProtobuf = async () => {
   try {
     protobufRoot = await protobuf.load("MarketDataFeed.proto");
@@ -18,6 +18,7 @@ const initProtobuf = async () => {
   }
 };
 
+// Decode Protobuf message
 const decodeProtobuf = (buffer) => {
   if (!protobufRoot) {
     console.warn("⚠️ Protobuf not initialized");
@@ -30,6 +31,19 @@ const decodeProtobuf = (buffer) => {
     return FeedResponse.decode(buffer);
   } catch (err) {
     console.error("❌ Error decoding Protobuf:", err);
+    return null;
+  }
+};
+
+// Convert Long Timestamp to JS Date
+const convertLttToDate = (ltt) => {
+  try {
+    if (!ltt || typeof ltt.toNumber !== "function") return null;
+    const nanos = ltt.high * Math.pow(2, 32) + (ltt.low >>> 0);
+    const millis = nanos / 1_000_000;
+    return new Date(millis);
+  } catch (err) {
+    console.warn("⚠️ Failed to convert ltt to Date:", err);
     return null;
   }
 };
@@ -50,7 +64,6 @@ export const startUpstoxFeed = async (accessToken) => {
     });
 
     const wsUrl = response.data.authorizedRedirectUri;
-
     await initProtobuf();
 
     const socket = new WS(wsUrl, {
@@ -63,26 +76,17 @@ export const startUpstoxFeed = async (accessToken) => {
     socket.on("open", () => {
       console.log("🔌 WebSocket connected");
 
-      // const subscriptionMsg = {
-      //   guid: "sub-reliance",
-      //   method: "sub",
-      //   data: {
-      //     mode: "full",
-      //     instrumentKeys: ["NSE_EQ|INE002A01018"], // Reliance Industries Limited
-      //   },
-      // };
-
       chunks.forEach((chunk, index) => {
         const subscriptionMsg = {
           guid: `sub-${index}`,
           method: "sub",
-          data: {
+          datæa: {
             mode: "full",
             instrumentKeys: chunk,
           },
         };
-      socket.send(Buffer.from(JSON.stringify(subscriptionMsg)));
-      console.log(`📡 Subscribed to chunk ${index + 1} with ${chunk.length} instruments`);
+        socket.send(Buffer.from(JSON.stringify(subscriptionMsg)));
+        console.log(`📡 Subscribed to chunk ${index + 1}`);
       });
     });
 
@@ -91,6 +95,8 @@ export const startUpstoxFeed = async (accessToken) => {
       const feeds = decoded?.feeds;
       if (!feeds) return;
 
+      const updates = [];
+
       for (const [symbol, entry] of Object.entries(feeds)) {
         const marketFF = entry?.ff?.marketFF;
         if (!marketFF) continue;
@@ -98,21 +104,55 @@ export const startUpstoxFeed = async (accessToken) => {
         const ltpc = marketFF?.ltpc;
         const { ltp, ltt, ltq, cp } = ltpc || {};
 
-        // ✅ Store to DB
-        await Stock.findOneAndUpdate(
-          { symbol },
-          {
-            marketData: marketFF,
-            ltp,
-            ltt: ltt ? new Date(ltt) : undefined,
-            ltq,
-            cp,
-          },
-          { upsert: true, new: true }
-        );
+        console.log("📦 Incoming:", symbol, {
+          ltp,
+          ltt: ltt?.toString?.(),
+          ltq: ltq?.toString?.(),
+          cp,
+        });
 
-        // ✅ Broadcast using helper (cleaner + scalable)
-        broadcastStockUpdate(symbol, { ltp, ltt, ltq, cp });
+        // Loosen the check: allow 0 ltp, just ensure not undefined
+        if (ltp === undefined || ltt === undefined) {
+          console.log("⚠️ Skipping - Missing ltp or ltt:", symbol);
+          continue;
+        }
+
+        const lttParsed = convertLttToDate(ltt);
+        const ltqParsed = ltq?.toNumber ? ltq.toNumber() : ltq;
+
+        try {
+          const updatedDoc = await Stock.findOneAndUpdate(
+            { symbol },
+            {
+              marketData: marketFF,
+              ltp,
+              ltq: ltqParsed,
+              cp,
+              ltt: lttParsed,
+            },
+            { upsert: true, new: true }
+          );
+
+          console.log("✅ Updated DB:", updatedDoc.symbol, updatedDoc.ltp);
+
+          updates.push({
+            symbol,
+            ltp,
+            ltq: ltqParsed,
+            cp,
+            ltt: lttParsed,
+          });
+        } catch (err) {
+          console.error("❌ Error updating DB:", symbol, err);
+        }
+      }
+
+      // ✅ Broadcast updated stock data
+      if (updates.length > 0) {
+        broadcast({
+          type: "live_stock_update",
+          data: updates,
+        });
       }
     });
 
