@@ -2,19 +2,17 @@ import { WebSocketServer } from "ws";
 import url from "url";
 import Stock from "../models/smModel.js";
 
-const clients = new Map(); // Map<ws, Set<symbol>>
+const clients = new Map();
 
-export const setupWebSocket = (serverOrPort = 8081) => {
-  const isPort = typeof serverOrPort === "number";
-
-  const wss = isPort
-    ? new WebSocketServer({ port: serverOrPort })         // local: port 8081
-    : new WebSocketServer({ server: serverOrPort });      // deploy: attach to Express
+export const setupWebSocket = (serverOrPort) => {
+  const wss =
+    typeof serverOrPort === "number"
+      ? new WebSocketServer({ port: serverOrPort }) // local
+      : new WebSocketServer({ server: serverOrPort }); // render
 
   wss.on("connection", async (ws, req) => {
     const parsedUrl = url.parse(req.url, true);
     const rawSymbols = parsedUrl.query.symbol;
-
     const symbolArray = Array.isArray(rawSymbols) ? rawSymbols : [rawSymbols];
     const subscribedSymbols = new Set(symbolArray.filter(Boolean));
 
@@ -39,7 +37,6 @@ export const setupWebSocket = (serverOrPort = 8081) => {
     });
   });
 
-  // Send data only to relevant clients
   const sendLiveUpdate = (payload) => {
     for (const [ws, subscribedSymbols] of clients.entries()) {
       if (ws.readyState === ws.OPEN) {
@@ -55,9 +52,13 @@ export const setupWebSocket = (serverOrPort = 8081) => {
     }
   };
 
-  // Global broadcaster
   global.liveStockBroadcaster = sendLiveUpdate;
 
-  const mode = isPort ? `ws://localhost:${serverOrPort}` : `Attached to HTTP server`;
-  console.log(`🚀 WebSocket server started on ${mode}`);
+  console.log(
+    `✅ WebSocket server started on ${
+      typeof serverOrPort === "number"
+        ? `ws://localhost:${serverOrPort}`
+        : "Render shared HTTP server"
+    }`
+  );
 };
