@@ -16,22 +16,26 @@ export function setupWebSocket(server = null) {
 
   wss.on("connection", (client, req) => {
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
-    const token = parsedUrl.searchParams.get("token");
-    const symbol = parsedUrl.searchParams.get("symbol");
+    const symbols = parsedUrl.searchParams.getAll("symbol"); // ⬅️ Get all 'symbol' query params
 
-    console.log("🔌 WebSocket Client Connected");
-    console.log("🔐 Token:", token);
-    console.log("📦 Symbol:", symbol);
-
+    client.symbols = new Set();
     addClient(client);
 
-    if (symbol) subscribeClient(client, symbol);
+    console.log("🔌 WebSocket Client Connected");
+
+    if (symbols.length > 0) {
+      console.log("📦 Subscribing to:", symbols);
+      symbols.forEach((sym) => subscribeClient(client, sym));
+    }
 
     client.on("message", (msg) => {
       try {
-        const { type, symbol } = JSON.parse(msg);
-        if (type === "subscribe" && symbol) {
-          subscribeClient(client, symbol);
+        const { type, symbol, symbols } = JSON.parse(msg);
+        if (type === "subscribe") {
+          if (symbol) subscribeClient(client, symbol);
+          if (Array.isArray(symbols)) {
+            symbols.forEach((sym) => subscribeClient(client, sym));
+          }
         }
       } catch (err) {
         console.error("💥 Error parsing message:", err);

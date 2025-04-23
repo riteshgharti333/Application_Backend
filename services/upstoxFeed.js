@@ -68,7 +68,13 @@ export const startUpstoxFeed = async (accessToken) => {
         method: "sub",
         data: {
           mode: "full",
-          instrumentKeys: ["NSE_EQ|INE002A01018"], // Reliance Industries Limited
+          instrumentKeys: [
+            "NSE_EQ|INE002A01018", // Reliance Industries
+            "NSE_EQ|INE020B01018", // HDFC Bank
+            "NSE_EQ|INE467B01029", // Infosys
+            "NSE_EQ|INE848E01016", // TCS
+            "NSE_EQ|INE062A01020"  // ICICI Bank
+          ]
         },
       };
 
