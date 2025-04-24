@@ -16,8 +16,7 @@ export function setupWebSocket(server = null) {
 
   wss.on("connection", (client, req) => {
     const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
-    const symbols = parsedUrl.searchParams.getAll("symbol"); // ⬅️ Get all 'symbol' query params
-
+    const symbols = parsedUrl.searchParams.getAll("symbol");
     client.symbols = new Set();
     addClient(client);
 

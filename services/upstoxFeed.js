@@ -4,6 +4,8 @@ import protobuf from "protobufjs";
 import smStock from "../models/smModel.js";
 import { chunks } from "../utils/instruments.js";
 
+import Stock from "../models/stockModel.js";
+
 import { broadcastStockUpdate } from "./stockBroadcaster.js";
 
 let protobufRoot = null;
@@ -69,12 +71,22 @@ export const startUpstoxFeed = async (accessToken) => {
         data: {
           mode: "full",
           instrumentKeys: [
-            "NSE_EQ|INE002A01018", // Reliance Industries
-            "NSE_EQ|INE020B01018", // HDFC Bank
-            "NSE_EQ|INE467B01029", // Infosys
-            "NSE_EQ|INE848E01016", // TCS
-            "NSE_EQ|INE062A01020"  // ICICI Bank
-          ]
+            "NSE_FO|69083",
+            "NSE_FO|69093",
+            "NSE_FO|69096",
+            "NSE_FO|69085",
+            "NSE_FO|73497",
+            "NSE_FO|73562",
+            "NSE_FO|73564",
+            "NSE_FO|69080",
+            "NSE_FO|69088",
+            "NSE_FO|69097",
+            "NSE_FO|69094",
+            "NSE_FO|69095",
+            "NSE_FO|69079",
+            "NSE_FO|73537",
+            "NSE_FO|65553"
+          ],
         },
       };
 
@@ -105,7 +117,7 @@ export const startUpstoxFeed = async (accessToken) => {
         const { ltp, ltt, ltq, cp } = ltpc || {};
 
         // ✅ Store to DB
-        await smStock.findOneAndUpdate(
+        await Stock.findOneAndUpdate(
           { symbol },
           {
             marketData: marketFF,
@@ -113,9 +125,10 @@ export const startUpstoxFeed = async (accessToken) => {
             ltt: ltt ? new Date(ltt) : undefined,
             ltq,
             cp,
-          },
-          { upsert: true, new: true }
+          }
         );
+
+        console.log(symbol, { ltp, ltt, ltq, cp });
 
         // ✅ Broadcast using helper (cleaner + scalable)
         broadcastStockUpdate(symbol, { ltp, ltt, ltq, cp });

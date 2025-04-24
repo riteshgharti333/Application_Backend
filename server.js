@@ -6,6 +6,12 @@ import { setupWebSocket } from "./sockets/websocketServer.js";
 import { startUpstoxFeed } from "./services/upstoxFeed.js";
 import { Auth } from "./models/authModel.js";
 
+// import { loginToJio } from './demo/puppeteer/login.js';
+
+// (async () => {
+//   await loginToJio(); // Start the login process
+// })()
+
 const PORT = process.env.PORT || 8080;
 
 (async () => {
@@ -38,7 +44,7 @@ const PORT = process.env.PORT || 8080;
 
     startUpstoxFeed(user.upstoxAccessToken);
   } catch (err) {
-    console.error("❌ Startup error:", err);
+    console.error("❌ Startup erro1r:", err);
     process.exit(1);
   }
 })();
