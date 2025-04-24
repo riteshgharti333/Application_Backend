@@ -85,7 +85,11 @@ export const startUpstoxFeed = async (accessToken) => {
             "NSE_FO|69095",
             "NSE_FO|69079",
             "NSE_FO|73537",
-            "NSE_FO|65553"
+            "NSE_FO|65553",
+            "NSE_FO|141561",
+            "NSE_FO|106061",
+            "NSE_FO|106062",
+            "NSE_FO|141565",
           ],
         },
       };
