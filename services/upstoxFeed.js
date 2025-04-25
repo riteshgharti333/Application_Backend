@@ -1,7 +1,6 @@
 import UpstoxClient from "upstox-js-sdk";
 import { WebSocket as WS } from "ws";
 import protobuf from "protobufjs";
-import smStock from "../models/smModel.js";
 import { chunks } from "../utils/instruments.js";
 
 import Stock from "../models/stockModel.js";
@@ -65,47 +64,49 @@ export const startUpstoxFeed = async (accessToken) => {
     socket.on("open", () => {
       console.log("🔌 WebSocket connected");
 
-      const subscriptionMsg = {
-        guid: "sub-reliance",
-        method: "sub",
-        data: {
-          mode: "full",
-          instrumentKeys: [
-            "NSE_FO|69083",
-            "NSE_FO|69093",
-            "NSE_FO|69096",
-            "NSE_FO|69085",
-            "NSE_FO|73497",
-            "NSE_FO|73562",
-            "NSE_FO|73564",
-            "NSE_FO|69080",
-            "NSE_FO|69088",
-            "NSE_FO|69097",
-            "NSE_FO|69094",
-            "NSE_FO|69095",
-            "NSE_FO|69079",
-            "NSE_FO|73537",
-            "NSE_FO|65553",
-            "NSE_FO|141561",
-            "NSE_FO|106061",
-            "NSE_FO|106062",
-            "NSE_FO|141565",
-          ],
-        },
-      };
+      // const subscriptionMsg = {
+      //   guid: "sub-reliance",
+      //   method: "sub",
+      //   data: {
+      //     mode: "full",
+      //     instrumentKeys: [
+      //       "NSE_FO|69083",
+      //       "NSE_FO|69093",
+      //       "NSE_FO|69096",
+      //       "NSE_FO|69085",
+      //       "NSE_FO|73497",
+      //       "NSE_FO|73562",
+      //       "NSE_FO|73564",
+      //       "NSE_FO|69080",
+      //       "NSE_FO|69088",
+      //       "NSE_FO|69097",
+      //       "NSE_FO|69094",
+      //       "NSE_FO|69095",
+      //       "NSE_FO|69079",
+      //       "NSE_FO|73537",
+      //       "NSE_FO|65553",
+      //       "NSE_FO|141561",
+      //       "NSE_FO|106061",
+      //       "NSE_FO|106062",
+      //       "NSE_FO|141565",
+      //     ],
+      //   },
+      // };
 
-      // chunks.forEach((chunk, index) => {
-      //   const subscriptionMsg = {
-      //     guid: `sub-${index}`,
-      //     method: "sub",
-      //     data: {
-      //       mode: "full",
-      //       instrumentKeys: chunk,
-      //     },
-      //   };
-      socket.send(Buffer.from(JSON.stringify(subscriptionMsg)));
-      // console.log(`📡 Subscribed to chunk ${index + 1} with ${chunk.length} instruments`);
-      // });
+      chunks.forEach((chunk, index) => {
+        const subscriptionMsg = {
+          guid: `sub-${index}`,
+          method: "sub",
+          data: {
+            mode: "full",
+            instrumentKeys: chunk,
+          },
+        };
+        socket.send(Buffer.from(JSON.stringify(subscriptionMsg)));
+        console.log(
+          `📡 Subscribed to chunk ${index + 1} with ${chunk.length} instruments`
+        );
+      });
     });
 
     socket.on("message", async (data) => {
