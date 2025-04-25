@@ -215,6 +215,8 @@ export const instrumentKeys = [
   "NSE_FO|57280",
   "NSE_FO|57286",
   "NSE_FO|57285",
+  "NSE_FO|120090",
+  "NSE_FO|120103",
 ];
 
 export function chunkArray(arr, size) {
