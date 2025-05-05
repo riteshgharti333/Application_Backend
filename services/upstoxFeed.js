@@ -102,9 +102,9 @@ export const startUpstoxFeed = async (accessToken) => {
           },
         };
         socket.send(Buffer.from(JSON.stringify(subscriptionMsg)));
-        console.log(
-          `📡 Subscribed to chunk ${index + 1} with ${chunk.length} instruments`
-        );
+        // console.log(
+        //   `📡 Subscribed to chunk ${index + 1} with ${chunk.length} instruments`
+        // );
       });
     });
 
@@ -132,7 +132,7 @@ export const startUpstoxFeed = async (accessToken) => {
           }
         );
 
-        console.log(symbol, { ltp, ltt, ltq, cp });
+        // console.log(symbol, { ltp, ltt, ltq, cp });
 
         // ✅ Broadcast using helper (cleaner + scalable)
         broadcastStockUpdate(symbol, { ltp, ltt, ltq, cp });
